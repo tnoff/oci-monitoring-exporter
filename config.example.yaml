@@ -1,0 +1,31 @@
+# Example query config for the OCI Monitoring exporter.
+#
+# In production this is mounted as a ConfigMap at the path given by
+# QUERIES_FILE (default /etc/oci-monitoring-exporter/queries.yaml). Each entry
+# is one (compartment, namespace, metric_names) tuple; the exporter polls every
+# metric in every entry on POLL_INTERVAL_SECONDS and re-exposes the latest
+# datapoint per resource on /metrics.
+#
+# The metrics below mirror what the current OCI alarms fire on (per-instance
+# CPU/memory + OKE node readiness) — the v1 coverage set. Replace the
+# compartment OCID with your own; refine the namespaces/metrics against your
+# alarm inventory (see the project doc's open questions).
+
+queries:
+  # Per-instance CPU + memory (the bulk of the existing compute alarms).
+  - compartment_id: ocid1.compartment.oc1..REPLACE_ME
+    namespace: oci_computeagent
+    metric_names:
+      - CPUUtilization
+      - MemoryUtilization
+    resource_group: null
+    statistic: mean
+    interval: 1m
+
+  # OKE node health — one series per (node pool, node condition).
+  - compartment_id: ocid1.compartment.oc1..REPLACE_ME
+    namespace: oci_oke
+    metric_names:
+      - KubernetesNodeCondition
+    statistic: mean
+    interval: 1m

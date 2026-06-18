@@ -1,0 +1,186 @@
+include:
+  - project: 'tnoff-projects/github-workflows'
+    ref: 0193182a94c8cfed9d78a344a071fc83a20af241
+    file: '/gitlab/tag.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: 0193182a94c8cfed9d78a344a071fc83a20af241
+    file: '/gitlab/discord-notify.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: 0193182a94c8cfed9d78a344a071fc83a20af241
+    file: '/gitlab/renovate.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: 0193182a94c8cfed9d78a344a071fc83a20af241
+    file: '/gitlab/trufflehog.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: 0193182a94c8cfed9d78a344a071fc83a20af241
+    file: '/gitlab/trufflehog-image.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: 0193182a94c8cfed9d78a344a071fc83a20af241
+    file: '/gitlab/bump-version.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: 0193182a94c8cfed9d78a344a071fc83a20af241
+    file: '/gitlab/trigger-bump.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: 0193182a94c8cfed9d78a344a071fc83a20af241
+    file: '/gitlab/buildkit-build-check.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: 0193182a94c8cfed9d78a344a071fc83a20af241
+    file: '/gitlab/buildkit-docker-push.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: 0193182a94c8cfed9d78a344a071fc83a20af241
+    file: '/gitlab/tox-pipeline.yml'
+
+default:
+  tags:
+    - self-hosted
+
+stages:
+  - validate
+  - test
+  - tag
+  - notify
+  - renovate
+
+# Shared rules for the image-build + image-scan jobs. On MRs that don't touch
+# anything baked into the image (the Dockerfile, python package source under
+# src/, or deps), skip these jobs — they otherwise burn runner slots needed by
+# the tox matrix. Fork MRs keep the manual gate; default-branch builds always
+# run.
+.image-build-rules:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID != $CI_PROJECT_ID
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - Dockerfile
+        - pyproject.toml
+        - src/**/*
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
+
+bump-version:
+  extends: .bump-version
+  variables:
+    GITLAB_PUSH_TOKEN: $RENOVATE_TOKEN
+    BUMP_CHANGELOG: 'true'
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^renovate\/dev-/
+
+validate-docker:
+  extends: .buildkit-build-check
+  rules: !reference [.image-build-rules, rules]
+
+# stage: tag overrides the template default (build) since this repo has no
+# build stage.
+docker-push:
+  extends: .buildkit-docker-push
+  stage: tag
+
+# Producer side of the docker-apps image-pin bump flow.
+# Rewrites the pin in apps/oci-monitoring-exporter/ on merge to main.
+# stage: tag overrides the template default (build) since this repo has no
+# build stage. See github-workflows/gitlab/trigger-bump.yml for details.
+trigger-bump-docker-apps:
+  extends: .trigger-bump
+  stage: tag
+  needs:
+    - job: docker-push
+      artifacts: true
+  variables:
+    BUMP_SOURCE: 'oci-monitoring-exporter'
+
+
+trufflehog:
+  extends: .trufflehog
+  stage: validate
+  rules:
+    # Fork MRs require a project member to manually trigger jobs — prevents untrusted code from running CI automatically
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID != $CI_PROJECT_ID
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+trufflehog-image:
+  extends: .trufflehog-image
+  stage: validate
+  needs: [validate-docker]
+  variables:
+    TRUFFLEHOG_IMAGE_TARBALL: image.tar
+  rules: !reference [.image-build-rules, rules]
+
+
+tox-generate:
+  extends: .tox-generate
+  variables:
+    # Pre-baked CI base image (ci-base-images:3.X) ships git + build tooling.
+    # ${CI_BASE_IMAGE_PATH} is the group-level plaintext var provisioned in
+    # terraform/infra/gitlab.tf and is expanded here at parent-pipeline time.
+    # $$ escapes the second dollar so ${PYTHON_VERSION} reaches tox-generate's
+    # heredoc literally; the child pipeline's parallel: matrix: then
+    # substitutes it per Python minor at runtime.
+    TOX_BASE_IMAGE: '${CI_BASE_IMAGE_PATH}:$${PYTHON_VERSION}'
+    TOX_GENERATE_IMAGE: '${CI_BASE_IMAGE_PATH}:3.14'
+
+tox-pipeline:
+  extends: .tox-pipeline
+
+release-tag:
+  extends: .tag
+  stage: tag
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
+      when: on_success
+
+notify-mr-opened:
+  extends: .discord-notify
+  stage: notify
+  needs: []
+  variables:
+    NOTIFY_TYPE: mr_opened
+    DISCORD_WEBHOOK_URL: $DISCORD_MR_OPENED_WEBHOOK
+  rules:
+    # Fork MRs require a project member to manually trigger jobs — prevents untrusted code from running CI automatically
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID != $CI_PROJECT_ID
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: always
+
+notify-release-failure:
+  extends: .discord-notify
+  stage: notify
+  needs: [release-tag, docker-push, trigger-bump-docker-apps]
+  variables:
+    NOTIFY_TYPE: failure
+    DISCORD_WEBHOOK_URL: $DISCORD_BUILD_FAILURE_WEBHOOK
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
+      when: on_failure
+
+notify-renovate-failure:
+  extends: .discord-notify
+  stage: renovate
+  needs: [renovate]
+  variables:
+    NOTIFY_TYPE: failure
+    DISCORD_WEBHOOK_URL: $DISCORD_BUILD_FAILURE_WEBHOOK
+    NOTIFY_MESSAGE: 'Renovate failed'
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: on_failure
+
+notify-mr-merged:
+  extends: .discord-notify
+  stage: notify
+  needs: []
+  variables:
+    NOTIFY_TYPE: mr_merged
+    DISCORD_WEBHOOK_URL: $DISCORD_MR_MERGED_WEBHOOK
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
+      when: always
+
+renovate:
+  extends: .renovate
+  stage: renovate
+  variables:
+    GITHUB_COM_TOKEN: $GITHUB_BOT_TOKEN
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
