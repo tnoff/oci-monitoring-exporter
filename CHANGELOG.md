@@ -6,6 +6,23 @@ file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-06-18
+
+### Added
+
+- Step 2 — the OCI read path. `OCIMonitoringClient.summarize` now calls
+  `summarize_metrics_data` for each metric in a query (over a 15-minute
+  window), keeps the newest aggregated datapoint per series, and flattens it
+  into a `Datapoint` carrying the OCI dimensions (`resourceId`, `region`, …)
+  as Prometheus labels. The exporter now serves live OCI metrics on
+  `/metrics` instead of an empty registry.
+
+### Changed
+
+- `OCIMetricsCollector` now builds each gauge family from the *union* of its
+  series' dimension keys (filling missing keys with `""`), so series of the
+  same metric with differing OCI dimensions no longer break exposition.
+
 ## [0.1.0] - 2026-06-17
 
 ### Added

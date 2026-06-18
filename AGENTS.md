@@ -19,7 +19,7 @@ consumer for its own internal observability. Don't conflate the two:
 |-----------------|-----------------------------------------------------------------------------|
 | `config.py`     | `Config.from_env()` (runtime knobs) + `load_queries()` (YAML ConfigMap).    |
 | `telemetry.py`  | OTLP setup/teardown + the exporter's own metric instruments.                |
-| `oci_client.py` | `OCIMonitoringClient` (SDK wrapper) + `build_mql()`. `summarize()` is Step 2.|
+| `oci_client.py` | `OCIMonitoringClient` (SDK wrapper) + `build_mql()` + `summarize()`.|
 | `exporter.py`   | `OCIMetricsCollector` (Prometheus collector) + `Exporter.poll()`.           |
 | `main.py`       | HTTP server (`/metrics` + `/healthz`), poll loop, SIGTERM handling.         |
 
@@ -37,4 +37,5 @@ consumer for its own internal observability. Don't conflate the two:
 ## Tests
 
 `tox` runs pytest + pylint + bandit across py3.13 / py3.14. pylint is expected
-at 10/10. Step 2 brings coverage to ≥90%.
+at 10/10, and CI enforces **100% diff coverage** (`diff-cover --fail-under=100`)
+— every changed `src/` line must be tested or `# pragma: no cover`'d.

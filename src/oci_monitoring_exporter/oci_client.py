@@ -1,19 +1,22 @@
-"""Thin wrapper over the OCI Monitoring ``SummarizeMetricsData`` API.
+"""Thin wrapper over the OCI Monitoring ``SummarizeMetricsData`` API."""
 
-The skeleton wires up the SDK client and the MQL statement builder; the actual
-``summarize_metrics_data`` call + response flattening is the Step 2 deliverable
-(see ``docs/projects/oci-monitoring-exporter.md``).
-"""
-
+import datetime
 import logging
 import os
 from dataclasses import dataclass, field
 
 import oci
+from oci.monitoring.models import SummarizeMetricsDataDetails
 
 from .config import Config, MetricQuery
 
 logger = logging.getLogger(__name__)
+
+# How far back to ask OCI for datapoints. OCI Monitoring aggregates to a
+# 1-minute minimum and a query window must be wider than the metric interval,
+# so a few minutes covers a [1m]/[5m] window with margin; we keep only the
+# newest datapoint per series regardless.
+_LOOKBACK_MINUTES = 15
 
 
 @dataclass
@@ -60,20 +63,39 @@ class OCIMonitoringClient:
     def summarize(self, query: MetricQuery) -> list[Datapoint]:
         """Return the latest datapoint per resource/dimension set for a query.
 
-        Step 2 deliverable: for each ``metric_name`` build the MQL via
-        :func:`build_mql`, call ``self._client.summarize_metrics_data`` against
-        ``query.compartment_id``, and flatten each returned ``MetricData``
-        series' newest aggregated datapoint into a :class:`Datapoint` carrying
-        ``resourceId``/``region`` (and any other OCI dimensions) as labels.
-
-        Stubbed in the skeleton: returns an empty list and logs at debug so the
-        exporter runs end-to-end (serves an empty ``/metrics``) before the OCI
-        read path lands.
+        For each ``metric_name`` builds the MQL via :func:`build_mql`, calls
+        ``summarize_metrics_data`` for ``query.compartment_id``, and flattens
+        each returned series' newest aggregated datapoint into a
+        :class:`Datapoint` carrying the OCI dimensions (``resourceId``,
+        ``region``, …) as labels.
         """
+        end = datetime.datetime.now(datetime.timezone.utc)
+        start = end - datetime.timedelta(minutes=_LOOKBACK_MINUTES)
+        results: list[Datapoint] = []
         for metric_name in query.metric_names:
-            logger.debug(
-                "summarize stub — would query MQL %r in compartment %s",
-                build_mql(metric_name, query),
-                query.compartment_id,
+            mql = build_mql(metric_name, query)
+            details = SummarizeMetricsDataDetails(
+                namespace=query.namespace,
+                query=mql,
+                start_time=start,
+                end_time=end,
+                resource_group=query.resource_group or None,
             )
-        return []
+            resp = self._client.summarize_metrics_data(
+                compartment_id=query.compartment_id,
+                summarize_metrics_data_details=details,
+            )
+            for series in resp.data:
+                if not series.aggregated_datapoints:
+                    continue
+                latest = max(series.aggregated_datapoints, key=lambda dp: dp.timestamp)
+                results.append(
+                    Datapoint(
+                        metric_name=series.name,
+                        namespace=series.namespace,
+                        value=float(latest.value),
+                        dimensions=dict(series.dimensions or {}),
+                    )
+                )
+            logger.debug("summarize %s -> %d series", mql, len(resp.data))
+        return results

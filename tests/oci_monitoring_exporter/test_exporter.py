@@ -38,6 +38,20 @@ def test_collector_yields_gauge_per_metric():
     assert family.samples[0].labels == {"region": "iad", "resource_id": "vm-1"}
 
 
+def test_collector_unions_inconsistent_dimension_keys():
+    # Two series of the same metric with differing dimension keys must not break
+    # exposition — the family uses the union, filling missing keys with "".
+    collector = OCIMetricsCollector()
+    collector.update([
+        Datapoint("CpuUtilization", "oci_computeagent", 1.0, {"resource_id": "vm-1", "region": "sjc"}),
+        Datapoint("CpuUtilization", "oci_computeagent", 2.0, {"resource_id": "vm-2"}),  # no region
+    ])
+    family = next(iter(collector.collect()))
+    assert sorted(family.samples[0].labels.keys()) == ["region", "resource_id"]
+    missing = [s for s in family.samples if s.labels["resource_id"] == "vm-2"][0]
+    assert missing.labels["region"] == ""
+
+
 class _FakeOCI:
     def __init__(self, datapoints, raise_for=None):
         self._datapoints = datapoints

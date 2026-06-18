@@ -11,11 +11,12 @@ Once the metrics are in Prometheus, alerts are re-authored in Grafana and
 delivered through Grafana's existing Discord wiring — no ONS → Discord relay
 needed for this class of alarm.
 
-> **Status: skeleton (Step 1b).** The scaffolding — config, telemetry, HTTP
-> server, poll loop, Prometheus collector — is in place and runs end-to-end,
-> serving an empty `/metrics`. The actual `SummarizeMetricsData` read path is
-> the Step 2 deliverable (`OCIMonitoringClient.summarize` is currently a stub).
-> See [`docs/projects/oci-monitoring-exporter.md`](https://gitlab.com/tnoff-projects/docs/-/blob/main/projects/oci-monitoring-exporter.md).
+> **Status: serving live metrics (Step 2).** Config, telemetry, HTTP server,
+> poll loop, Prometheus collector, and the `SummarizeMetricsData` read path are
+> all in place — the exporter polls OCI and re-exposes the latest datapoints on
+> `/metrics`. Remaining work is deployment (terraform reader bot + k8s Secret,
+> docker-apps Deployment) and Grafana dashboards/alerts. See
+> [`docs/projects/oci-monitoring-exporter.md`](https://gitlab.com/tnoff-projects/docs/-/blob/main/projects/oci-monitoring-exporter.md).
 
 ## How it works
 

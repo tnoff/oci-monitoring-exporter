@@ -59,20 +59,23 @@ class OCIMetricsCollector(Collector):
         with self._lock:
             datapoints = list(self._latest)
 
-        families: dict[str, GaugeMetricFamily] = {}
+        # Group by Prometheus metric name. Each family needs a single, stable
+        # label set, but OCI may return differing dimension keys across series
+        # of the same metric — so use the union of keys and fill missing ones
+        # with "" (a label every family member shares, just empty).
+        grouped: dict[str, list[Datapoint]] = {}
+        descriptions: dict[str, str] = {}
         for dp in datapoints:
             name = metric_name(dp.namespace, dp.metric_name)
-            family = families.get(name)
-            if family is None:
-                family = GaugeMetricFamily(
-                    name,
-                    f"OCI Monitoring {dp.namespace}/{dp.metric_name}",
-                    labels=sorted(dp.dimensions.keys()),
-                )
-                families[name] = family
-            labels = [dp.dimensions[k] for k in sorted(dp.dimensions.keys())]
-            family.add_metric(labels, dp.value)
-        yield from families.values()
+            grouped.setdefault(name, []).append(dp)
+            descriptions.setdefault(name, f"OCI Monitoring {dp.namespace}/{dp.metric_name}")
+
+        for name, points in grouped.items():
+            label_keys = sorted({k for dp in points for k in dp.dimensions})
+            family = GaugeMetricFamily(name, descriptions[name], labels=label_keys)
+            for dp in points:
+                family.add_metric([dp.dimensions.get(k, "") for k in label_keys], dp.value)
+            yield family
 
 
 class Exporter:
