@@ -22,6 +22,20 @@ from .telemetry import setup_telemetry, create_metrics, shutdown_telemetry
 
 logger = logging.getLogger(__name__)
 
+# Third-party loggers that are pure noise once the app runs at root DEBUG.
+# urllib3 logs a line for *every* HTTP request — including each OTLP export POST
+# to the collector (`"POST /v1/logs HTTP/1.1" 200`), which the OTLP LoggingHandler
+# then ships straight back out, amplifying the spam. The OCI SDK's own request
+# traffic rides the same logger. We keep the exporter's logs at DEBUG; quiet these.
+_NOISY_LOGGERS = ("urllib3",)
+
+
+def quiet_noisy_loggers(level=logging.WARNING):
+    """Raise chatty third-party loggers above DEBUG so their per-request output
+    doesn't drown the exporter's own logs (or echo back through OTLP)."""
+    for name in _NOISY_LOGGERS:
+        logging.getLogger(name).setLevel(level)
+
 
 class _ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
     """Serve scrapes concurrently so a slow client can't block /healthz."""
@@ -78,6 +92,9 @@ def main() -> int:
     except ValueError as e:
         logger.error("Configuration error: %s", e)
         return 1
+
+    if not cfg.third_party_debug_logs:
+        quiet_noisy_loggers()
 
     meter_provider, logger_provider = setup_telemetry(cfg)
     app_metrics = create_metrics(meter_provider)

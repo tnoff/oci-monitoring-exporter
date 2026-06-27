@@ -1,5 +1,6 @@
 """Tests for the HTTP app, poll loop, and main wiring."""
 
+import logging
 import socket
 import threading
 import urllib.request
@@ -42,6 +43,25 @@ def test_metrics_path_serves_exposition():
     status, body = _call(app, "/metrics")
     assert status.startswith("200")
     assert b"demo_metric 3.0" in body
+
+
+def test_quiet_noisy_loggers_raises_level():
+    log = logging.getLogger("urllib3")
+    log.setLevel(logging.DEBUG)
+    try:
+        main_mod.quiet_noisy_loggers()
+        assert log.level == logging.WARNING
+    finally:
+        log.setLevel(logging.NOTSET)
+
+
+def test_quiet_noisy_loggers_honours_explicit_level():
+    log = logging.getLogger("urllib3")
+    try:
+        main_mod.quiet_noisy_loggers(logging.ERROR)
+        assert log.level == logging.ERROR
+    finally:
+        log.setLevel(logging.NOTSET)
 
 
 def test_run_poll_loop_stops_on_event():
@@ -108,6 +128,26 @@ def test_main_success_path(monkeypatch, make_config):
 
     assert main_mod.main() == 0
     assert fake.shut is True  # finally block ran
+
+
+def _run_main_with_spy(monkeypatch, cfg):
+    """Run main() with deps stubbed, spying on whether quiet_noisy_loggers ran."""
+    called = {"n": 0}
+    _patch_main_deps(monkeypatch, cfg, lambda c: object())
+    monkeypatch.setattr(main_mod, "serve", lambda c: type("H", (), {"shutdown": lambda s: None})())
+    monkeypatch.setattr(main_mod, "run_poll_loop", lambda exporter, interval, stop: None)
+    monkeypatch.setattr(main_mod, "quiet_noisy_loggers", lambda: called.__setitem__("n", called["n"] + 1))
+    assert main_mod.main() == 0
+    return called["n"]
+
+
+def test_main_quiets_noisy_loggers_by_default(monkeypatch, make_config):
+    assert _run_main_with_spy(monkeypatch, make_config(queries=[])) == 1
+
+
+def test_main_keeps_debug_when_toggled_on(monkeypatch, make_config):
+    cfg = make_config(queries=[], third_party_debug_logs=True)
+    assert _run_main_with_spy(monkeypatch, cfg) == 0
 
 
 def test_main_returns_1_on_oci_client_error(monkeypatch, make_config):

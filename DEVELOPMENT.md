@@ -48,6 +48,7 @@ The reader user needs `read metrics` on the compartments it polls.
 | `OTLP_INSECURE`         | `true`                                         | Whether the OTLP exporter skips TLS.                         |
 | `OTLP_METRICS_ENABLED`  | `false`                                        | Emit the exporter's own OTLP metrics.                        |
 | `OTLP_LOGS_ENABLED`     | `false`                                        | Ship Python logs to OTLP via the OTel `LoggingHandler`.      |
+| `THIRD_PARTY_DEBUG_LOGS`| `false`                                        | Keep urllib3's per-request DEBUG lines (every OTLP/OCI HTTP call). Off by default so they don't drown the app's logs or echo back through OTLP. |
 
 ## Query config
 

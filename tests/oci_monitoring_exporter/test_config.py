@@ -11,7 +11,7 @@ def test_from_env_defaults(monkeypatch):
     for var in (
         "OTLP_ENDPOINT", "OTLP_METRICS_ENABLED", "OTLP_LOGS_ENABLED", "METRICS_PORT",
         "METRICS_ADDR", "POLL_INTERVAL_SECONDS", "OCI_CONFIG_FILE", "OCI_PROFILE",
-        "OCI_REGION", "QUERIES_FILE",
+        "OCI_REGION", "QUERIES_FILE", "THIRD_PARTY_DEBUG_LOGS",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -23,6 +23,8 @@ def test_from_env_defaults(monkeypatch):
     assert cfg.otlp_endpoint == "http://localhost:4318"
     assert cfg.otlp_metrics_enabled is False
     assert cfg.oci_profile == "DEFAULT"
+    # Third-party HTTP debug noise is off by default.
+    assert cfg.third_party_debug_logs is False
     # Default queries file doesn't exist in the test env → empty list, no crash.
     assert cfg.queries == []
 
@@ -33,6 +35,7 @@ def test_from_env_overrides(monkeypatch):
     monkeypatch.setenv("OTLP_METRICS_ENABLED", "TRUE")
     monkeypatch.setenv("OCI_REGION", "us-phoenix-1")
     monkeypatch.setenv("QUERIES_FILE", "/nope.yaml")
+    monkeypatch.setenv("THIRD_PARTY_DEBUG_LOGS", "TRUE")
 
     cfg = Config.from_env()
 
@@ -40,6 +43,7 @@ def test_from_env_overrides(monkeypatch):
     assert cfg.poll_interval_seconds == 30
     assert cfg.otlp_metrics_enabled is True
     assert cfg.oci_region == "us-phoenix-1"
+    assert cfg.third_party_debug_logs is True
 
 
 @pytest.mark.parametrize("port", [0, 70000])

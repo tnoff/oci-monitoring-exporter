@@ -71,6 +71,13 @@ class Config:
 
     # Path to the YAML query file, plus the parsed queries.
     queries_file: str
+
+    # When False (default) the chatty third-party HTTP loggers (urllib3 — every
+    # OTLP export POST + OCI API call) are quieted to WARNING so they don't drown
+    # the exporter's own DEBUG logs or echo back through OTLP. Flip to True to
+    # restore them for debugging the HTTP/OTLP path.
+    third_party_debug_logs: bool = False
+
     queries: list[MetricQuery] = field(default_factory=list)
 
     def __post_init__(self):
@@ -96,6 +103,7 @@ class Config:
             oci_profile=os.getenv("OCI_PROFILE", "DEFAULT"),
             oci_region=os.getenv("OCI_REGION", ""),
             queries_file=queries_file,
+            third_party_debug_logs=os.getenv("THIRD_PARTY_DEBUG_LOGS", "false").lower() == "true",
             queries=load_queries(queries_file),
         )
 
