@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Bumped oci to v2.181.1
+
+## [0.2.3] - 2026-07-11
+
+### Changed
+
 - Bumped opentelemetry-sdk to v1.43.0
 
 ## [0.2.2] - 2026-07-10
