@@ -4,7 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oci-monitoring-exporter"
-version = "0.1.0"
+# Single source of truth: read from the VERSION file (CI bumps it via
+# github-workflows/gitlab/bump-version.yml; push:tag tags from it).
+dynamic = ["version"]
 requires-python = ">=3.13"
 dependencies = [
     "oci==2.181.1",
@@ -26,6 +28,9 @@ dev = [
     "pytest-cov==7.1.0",
     "pytest-mock==3.15.1",
 ]
+
+[tool.setuptools.dynamic]
+version = { file = "VERSION" }
 
 [tool.setuptools.packages.find]
 where = ["."]
