@@ -13,7 +13,7 @@ dependencies = [
     "prometheus-client==0.25.0",
     "PyYAML==6.0.3",
     "opentelemetry-api",
-    "opentelemetry-sdk==1.43.0",
+    "opentelemetry-sdk==1.44.0",
     "opentelemetry-exporter-otlp",
     "opentelemetry-instrumentation",
     "opentelemetry-instrumentation-logging",
