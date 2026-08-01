@@ -9,7 +9,7 @@ name = "oci-monitoring-exporter"
 dynamic = ["version"]
 requires-python = ">=3.13"
 dependencies = [
-    "oci==2.182.1",
+    "oci==2.183.0",
     "prometheus-client==0.26.0",
     "PyYAML==6.0.3",
     "opentelemetry-api",
