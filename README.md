@@ -16,7 +16,7 @@ needed for this class of alarm.
 > all in place — the exporter polls OCI and re-exposes the latest datapoints on
 > `/metrics`. Remaining work is deployment (terraform reader bot + k8s Secret,
 > docker-apps Deployment) and Grafana dashboards/alerts. See
-> [`docs/projects/oci-monitoring-exporter.md`](https://gitlab.com/tnoff-projects/docs/-/blob/main/projects/oci-monitoring-exporter.md).
+> [`docs/projects/oci-monitoring-exporter.md`](https://github.com/tnoff/docs/blob/main/projects/oci-monitoring-exporter.md).
 
 ## How it works
 
