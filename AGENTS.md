@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Orientation for AI agents and new contributors. See
-[`docs/projects/oci-monitoring-exporter.md`](https://gitlab.com/tnoff-projects/docs/-/blob/main/projects/oci-monitoring-exporter.md)
+[`docs/projects/oci-monitoring-exporter.md`](https://github.com/tnoff/docs/blob/main/projects/oci-monitoring-exporter.md)
 for the full project plan and rollout steps.
 
 ## What this is
