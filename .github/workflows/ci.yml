@@ -21,7 +21,7 @@ permissions:
 jobs:
   secrets:
     name: Scan for secrets
-    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@badea054ae56c6ca72252cd22dab3a9f9b65268f
+    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@b5f1653b3f3a9750af00c7bfda9af04fe263c1b1
 
   # extra_apt is deliberately empty. The GitLab job ran on ci-base-images,
   # advertised as "git + build tooling", but that was the fleet-wide Python
@@ -30,7 +30,7 @@ jobs:
   # on the runner.
   tox:
     name: Tox
-    uses: tnoff/github-workflows/.github/workflows/tox.yml@badea054ae56c6ca72252cd22dab3a9f9b65268f
+    uses: tnoff/github-workflows/.github/workflows/tox.yml@b5f1653b3f3a9750af00c7bfda9af04fe263c1b1
 
   # Reimplements .image-build-rules' `changes:` block: only rebuild when
   # something baked into the image changed. Doc-only, renovate.json and
@@ -80,7 +80,7 @@ jobs:
     name: Build and scan image
     needs: changes
     if: needs.changes.outputs.image == 'true'
-    uses: tnoff/github-workflows/.github/workflows/docker-build-check.yml@badea054ae56c6ca72252cd22dab3a9f9b65268f
+    uses: tnoff/github-workflows/.github/workflows/docker-build-check.yml@b5f1653b3f3a9750af00c7bfda9af04fe263c1b1
 
   bump-version:
     name: Bump version
@@ -90,7 +90,7 @@ jobs:
     if: startsWith(github.head_ref, 'renovate/dev-')
     permissions:
       contents: write
-    uses: tnoff/github-workflows/.github/workflows/bump-version.yml@badea054ae56c6ca72252cd22dab3a9f9b65268f
+    uses: tnoff/github-workflows/.github/workflows/bump-version.yml@b5f1653b3f3a9750af00c7bfda9af04fe263c1b1
     with:
       bump_changelog: true
     secrets:
