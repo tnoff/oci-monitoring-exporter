@@ -20,3 +20,7 @@ spec:
   type: service
   owner: group:default/admin
   lifecycle: production
+  # Part of the observability stack, whose other eight components have no repo of
+  # their own and are declared in docker-apps. This is the one piece of it that
+  # is built here, so the System membership has to be written on this side.
+  system: monitoring
