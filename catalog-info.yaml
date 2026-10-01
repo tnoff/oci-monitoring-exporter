@@ -24,3 +24,5 @@ spec:
   # their own and are declared in docker-apps. This is the one piece of it that
   # is built here, so the System membership has to be written on this side.
   system: monitoring
+  consumesApis:
+    - api:default/image-bump
