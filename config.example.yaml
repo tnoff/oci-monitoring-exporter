@@ -6,10 +6,8 @@
 # metric in every entry on POLL_INTERVAL_SECONDS and re-exposes the latest
 # datapoint per resource on /metrics.
 #
-# The metrics below mirror what the current OCI alarms fire on (per-instance
-# CPU/memory + OKE node readiness) — the v1 coverage set. Replace the
-# compartment OCID with your own; refine the namespaces/metrics against your
-# alarm inventory (see the project doc's open questions).
+# The metrics below are per-instance CPU/memory and OKE node readiness. Replace
+# the compartment OCID with your own and adjust namespaces/metrics to taste.
 
 queries:
   # Per-instance CPU + memory (the bulk of the existing compute alarms).

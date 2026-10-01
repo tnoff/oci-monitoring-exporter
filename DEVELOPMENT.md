@@ -27,8 +27,8 @@ python -m src.oci_monitoring_exporter
 
 ## Authentication
 
-The exporter uses a traditional OCI user + API key (instance principals are a
-later add). The SDK reads a standard `~/.oci/config` profile; in production the
+The exporter uses a traditional OCI user + API key (instance principals are not
+supported). The SDK reads a standard `~/.oci/config` profile; in production the
 profile + PEM key are mounted into the Pod from a Kubernetes Secret
 (`oci-monitoring-exporter-creds`), the same shape as `security-scanner-read-bot`.
 The reader user needs `read metrics` on the compartments it polls.
@@ -44,11 +44,14 @@ The reader user needs `read metrics` on the compartments it polls.
 | `OCI_CONFIG_FILE`       | `~/.oci/config`                                | OCI SDK config file location.                                |
 | `OCI_PROFILE`           | `DEFAULT`                                      | Profile within the OCI config file.                          |
 | `OCI_REGION`            | _(unset → profile's region)_                   | Override the region for the Monitoring client.               |
-| `OTLP_ENDPOINT`         | `http://localhost:4318`                        | OTLP HTTP endpoint for the exporter's own telemetry.         |
-| `OTLP_INSECURE`         | `true`                                         | Whether the OTLP exporter skips TLS.                         |
 | `OTLP_METRICS_ENABLED`  | `false`                                        | Emit the exporter's own OTLP metrics.                        |
 | `OTLP_LOGS_ENABLED`     | `false`                                        | Ship Python logs to OTLP via the OTel `LoggingHandler`.      |
 | `THIRD_PARTY_DEBUG_LOGS`| `false`                                        | Keep urllib3's per-request DEBUG lines (every OTLP/OCI HTTP call). Off by default so they don't drown the app's logs or echo back through OTLP. |
+
+The OTLP exporters are configured through the standard `OTEL_EXPORTER_OTLP_*`
+environment variables (the Deployment sets `OTEL_EXPORTER_OTLP_ENDPOINT`,
+`OTEL_SERVICE_NAME` and friends). `Config` also parses `OTLP_ENDPOINT` and
+`OTLP_INSECURE`, but nothing reads them, so setting them has no effect.
 
 ## Query config
 
@@ -63,7 +66,7 @@ starts the exporter with no queries (empty `/metrics`) rather than crash-looping
 src/oci_monitoring_exporter/
   config.py      env vars + YAML query loader
   telemetry.py   OTLP setup for the exporter's own observability
-  oci_client.py  OCI Monitoring SDK wrapper + MQL builder (summarize() is Step 2)
+  oci_client.py  OCI Monitoring SDK wrapper + MQL builder (`summarize()` reads the latest datapoint per series)
   exporter.py    Prometheus collector + poll cycle
   main.py        HTTP server (/metrics + /healthz), poll loop, signal handling
 ```
