@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import oci
 from oci.monitoring.models import SummarizeMetricsDataDetails
 
-from .config import Config, MetricQuery
+from .config import AUTH_RESOURCE_PRINCIPAL, Config, MetricQuery
 
 logger = logging.getLogger(__name__)
 
@@ -48,10 +48,21 @@ class OCIMonitoringClient:
 
     def __init__(self, cfg: Config, client=None):
         self._cfg = cfg
+        self._client = client
         if client is not None:
-            # Injected for tests, or to swap in instance-principal auth later.
-            self._client = client
+            # Injected for tests.
             return
+        if cfg.oci_auth == AUTH_RESOURCE_PRINCIPAL:
+            logger.info("OCI auth mode: resource_principal (sidecar-provided session token)")
+            # The sidecar may not have written its token/key files yet (or may
+            # be retrying after an IAM change), so a failure here is not fatal:
+            # the signer is built lazily and retried on every poll until it works.
+            try:
+                self._client = self._build_resource_principal_client()
+            except Exception as e:
+                self._warn_not_ready(e)
+            return
+        logger.info("OCI auth mode: api_key (config file %s, profile %s)", cfg.oci_config_file, cfg.oci_profile)
         oci_config = oci.config.from_file(
             file_location=os.path.expanduser(cfg.oci_config_file),
             profile_name=cfg.oci_profile,
@@ -59,6 +70,30 @@ class OCIMonitoringClient:
         if cfg.oci_region:
             oci_config["region"] = cfg.oci_region
         self._client = oci.monitoring.MonitoringClient(oci_config)
+
+    def _build_resource_principal_client(self):
+        """Build the signer + client once; the SDK re-reads the token file itself."""
+        signer = oci.auth.signers.get_resource_principals_signer()
+        config = {"region": self._cfg.oci_region} if self._cfg.oci_region else {}
+        return oci.monitoring.MonitoringClient(config=config, signer=signer)
+
+    @staticmethod
+    def _warn_not_ready(exc: Exception) -> None:
+        # Only the exception text is logged, never token or key contents.
+        logger.warning(
+            "Resource principal signer not ready (%s: %s); will retry on the next poll",
+            type(exc).__name__, exc,
+        )
+
+    def _get_client(self):
+        """Return the cached client, building the resource principal one if needed."""
+        if self._client is None:
+            try:
+                self._client = self._build_resource_principal_client()
+            except Exception as e:
+                self._warn_not_ready(e)
+                raise
+        return self._client
 
     def summarize(self, query: MetricQuery) -> list[Datapoint]:
         """Return the latest datapoint per resource/dimension set for a query.
@@ -81,7 +116,7 @@ class OCIMonitoringClient:
                 end_time=end,
                 resource_group=query.resource_group or None,
             )
-            resp = self._client.summarize_metrics_data(
+            resp = self._get_client().summarize_metrics_data(
                 compartment_id=query.compartment_id,
                 summarize_metrics_data_details=details,
             )

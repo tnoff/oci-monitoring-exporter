@@ -11,7 +11,7 @@ def test_from_env_defaults(monkeypatch):
     for var in (
         "OTLP_ENDPOINT", "OTLP_METRICS_ENABLED", "OTLP_LOGS_ENABLED", "METRICS_PORT",
         "METRICS_ADDR", "POLL_INTERVAL_SECONDS", "OCI_CONFIG_FILE", "OCI_PROFILE",
-        "OCI_REGION", "QUERIES_FILE", "THIRD_PARTY_DEBUG_LOGS",
+        "OCI_REGION", "OCI_AUTH", "QUERIES_FILE", "THIRD_PARTY_DEBUG_LOGS",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -23,6 +23,7 @@ def test_from_env_defaults(monkeypatch):
     assert cfg.otlp_endpoint == "http://localhost:4318"
     assert cfg.otlp_metrics_enabled is False
     assert cfg.oci_profile == "DEFAULT"
+    assert cfg.oci_auth == "api_key"
     # Third-party HTTP debug noise is off by default.
     assert cfg.third_party_debug_logs is False
     # Default queries file doesn't exist in the test env → empty list, no crash.
@@ -106,3 +107,19 @@ def test_load_queries_empty_file(tmp_path):
     f = tmp_path / "queries.yaml"
     f.write_text("")
     assert load_queries(str(f)) == []
+
+
+def test_oci_auth_resource_principal_from_env(monkeypatch):
+    monkeypatch.setenv("OCI_AUTH", " Resource_Principal ")
+    assert Config.from_env().oci_auth == "resource_principal"
+
+
+def test_oci_auth_empty_falls_back_to_api_key(monkeypatch):
+    monkeypatch.setenv("OCI_AUTH", "")
+    assert Config.from_env().oci_auth == "api_key"
+
+
+def test_oci_auth_invalid_rejected(monkeypatch):
+    monkeypatch.setenv("OCI_AUTH", "instance_principal")
+    with pytest.raises(ValueError, match="OCI_AUTH must be one of api_key, resource_principal"):
+        Config.from_env()
