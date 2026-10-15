@@ -27,8 +27,11 @@ consumer for its own internal observability. Don't conflate the two:
 
 - **Config, not code.** The metric queries live in a YAML ConfigMap, never
   hardcoded in the readers. Coverage changes shouldn't require an image rebuild.
-- **No instance principals.** Traditional OCI user + API key, mounted from
-  a k8s Secret — mirrors `security-scanner-read-bot`.
+- **No instance principals.** Auth is a traditional OCI user + API key
+  (mounted from a k8s Secret, mirrors `security-scanner-read-bot`) by default
+  (`OCI_AUTH=api_key`), with OCI resource principal fed by a token sidecar
+  (`OCI_AUTH=resource_principal`) as the opt-in alternative — never instance
+  principals.
 - **Metric names are derived, not configured.** `exporter.metric_name()` builds
   them from the series OCI returns; renaming that function's output breaks the
   Grafana rules and dashboard in docker-apps that query these series.

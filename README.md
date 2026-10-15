@@ -58,11 +58,31 @@ The exporter's own telemetry is sent over OTLP when `OTLP_METRICS_ENABLED` /
 
 ## Authentication
 
-Traditional OCI user + API key (a `~/.oci/config` profile + PEM key mounted into
-the Pod), matching the `security-scanner-read-bot` pattern; the user needs
-`read metrics` on the polled compartments. Instance principals are not
-supported. See [DEVELOPMENT.md](DEVELOPMENT.md) for the environment-variable
-reference.
+Selected with `OCI_AUTH` (invalid values are a configuration error):
+
+- `api_key` (default): traditional OCI user + API key (a `~/.oci/config`
+  profile + PEM key mounted into the Pod, `OCI_CONFIG_FILE` / `OCI_PROFILE`),
+  matching the `security-scanner-read-bot` pattern; the user needs
+  `read metrics` on the polled compartments.
+- `resource_principal`: OCI resource principal, fed by a sidecar container that
+  writes a session token and private key to files. `OCI_CONFIG_FILE` is not
+  read. The Deployment sets the variables the OCI SDK reads:
+
+  | Variable                              | Value                          |
+  |---------------------------------------|--------------------------------|
+  | `OCI_RESOURCE_PRINCIPAL_VERSION`      | `2.2`                          |
+  | `OCI_RESOURCE_PRINCIPAL_RPST`         | path to the session token file |
+  | `OCI_RESOURCE_PRINCIPAL_PRIVATE_PEM`  | path to the private key PEM    |
+  | `OCI_RESOURCE_PRINCIPAL_REGION`       | OCI region, e.g. `us-sanjose-1`|
+
+  The signer is created once and reused; the SDK re-reads the token file as the
+  sidecar refreshes it. If the files are not there yet (sidecar starting, or
+  retrying after an IAM change) the exporter logs a WARNING and retries on each
+  poll instead of exiting; failed polls are logged and counted as
+  `outcome="error"` as usual.
+
+Instance principals are not supported. See [DEVELOPMENT.md](DEVELOPMENT.md) for
+the environment-variable reference.
 
 ## Configuration
 

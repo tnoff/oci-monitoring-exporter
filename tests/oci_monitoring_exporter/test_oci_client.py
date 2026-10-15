@@ -1,7 +1,10 @@
 """Tests for the OCI Monitoring client wrapper."""
 
 import datetime
+import logging
 from types import SimpleNamespace
+
+import pytest
 
 from src.oci_monitoring_exporter import oci_client as oci_client_mod
 from src.oci_monitoring_exporter.config import MetricQuery
@@ -129,3 +132,103 @@ def test_init_builds_real_client_from_config(make_config, monkeypatch):
     assert captured["oci_config"]["region"] == "us-sanjose-1"
     # ~ is expanded before handing the path to the SDK.
     assert "~" not in captured["file_location"]
+
+
+def test_api_key_mode_logs_and_does_not_use_signer(make_config, monkeypatch, caplog):
+    def no_signer():
+        raise AssertionError("signer must not be used in api_key mode")
+
+    monkeypatch.setattr(oci_client_mod.oci.auth.signers, "get_resource_principals_signer", no_signer)
+    monkeypatch.setattr(oci_client_mod.oci.config, "from_file", lambda **_: {"region": "x"})
+    monkeypatch.setattr(oci_client_mod.oci.monitoring, "MonitoringClient", lambda cfg: "SDK_CLIENT")
+    with caplog.at_level(logging.INFO):
+        client = OCIMonitoringClient(make_config(oci_auth="api_key"))
+    assert client._client == "SDK_CLIENT"
+    assert "OCI auth mode: api_key" in caplog.text
+
+
+class _RPSpy:
+    """Stands in for the SDK: counts signer builds, records client construction."""
+
+    def __init__(self, monkeypatch, fail_signer_times=0, responses=()):
+        self.signer_calls = 0
+        self.client_kwargs = []
+        self.fail_signer_times = fail_signer_times
+        self.fake = _FakeMonitoringClient(list(responses))
+        self.signer = object()
+        monkeypatch.setattr(oci_client_mod.oci.auth.signers, "get_resource_principals_signer", self._signer)
+        monkeypatch.setattr(oci_client_mod.oci.monitoring, "MonitoringClient", self._client)
+        monkeypatch.setattr(
+            oci_client_mod.oci.config, "from_file",
+            lambda **_: pytest.fail("OCI_CONFIG_FILE must not be read in resource_principal mode"),
+        )
+
+    def _signer(self):
+        self.signer_calls += 1
+        if self.signer_calls <= self.fail_signer_times:
+            raise FileNotFoundError("/var/run/rpst/token")
+        return self.signer
+
+    def _client(self, **kwargs):
+        self.client_kwargs.append(kwargs)
+        return self.fake
+
+
+def _series(value):
+    return [SimpleNamespace(
+        name="CpuUtilization", namespace="oci_computeagent",
+        dimensions={"resourceId": "vm-1"}, aggregated_datapoints=[_dp(value, 1)],
+    )]
+
+
+def test_resource_principal_passes_signer_and_region(make_config, monkeypatch, caplog):
+    spy = _RPSpy(monkeypatch)
+    with caplog.at_level(logging.INFO):
+        OCIMonitoringClient(make_config(oci_auth="resource_principal", oci_region="us-sanjose-1"))
+    assert spy.client_kwargs == [{"config": {"region": "us-sanjose-1"}, "signer": spy.signer}]
+    assert "OCI auth mode: resource_principal" in caplog.text
+
+
+def test_resource_principal_without_region_uses_empty_config(make_config, monkeypatch):
+    spy = _RPSpy(monkeypatch)
+    OCIMonitoringClient(make_config(oci_auth="resource_principal", oci_region=""))
+    assert spy.client_kwargs == [{"config": {}, "signer": spy.signer}]
+
+
+def test_resource_principal_signer_built_once_across_polls(make_config, monkeypatch, sample_query):
+    spy = _RPSpy(monkeypatch, responses=[_series(1.0), _series(2.0), _series(3.0)])
+    client = OCIMonitoringClient(make_config(oci_auth="resource_principal"))
+    q = MetricQuery(compartment_id="c", namespace="oci_computeagent", metric_names=["CPUUtilization"])
+    for _ in range(3):
+        client.summarize(q)
+    assert spy.signer_calls == 1
+    assert len(spy.client_kwargs) == 1
+    assert len(spy.fake.calls) == 3
+
+
+def test_resource_principal_missing_files_at_startup_retried(make_config, monkeypatch, caplog):
+    spy = _RPSpy(monkeypatch, fail_signer_times=2, responses=[_series(5.0)])
+    with caplog.at_level(logging.WARNING):
+        client = OCIMonitoringClient(make_config(oci_auth="resource_principal"))  # must not raise
+    assert "not ready" in caplog.text
+    assert "FileNotFoundError" in caplog.text
+    q = MetricQuery(compartment_id="c", namespace="oci_computeagent", metric_names=["CPUUtilization"])
+
+    with pytest.raises(FileNotFoundError):  # poll 1: still missing; Exporter.poll logs + counts it
+        client.summarize(q)
+    out = client.summarize(q)  # poll 2: sidecar has written the files
+    assert [dp.value for dp in out] == [5.0]
+    client.summarize(q)  # poll 3: reuses the signer
+    assert spy.signer_calls == 3
+    assert len(spy.client_kwargs) == 1
+
+
+def test_resource_principal_logs_no_secrets(make_config, monkeypatch, tmp_path, caplog):
+    token = tmp_path / "token"
+    pem = tmp_path / "key.pem"
+    token.write_text("SECRET-TOKEN-CONTENT")
+    pem.write_text("SECRET-PEM-CONTENT")
+    _RPSpy(monkeypatch)
+    with caplog.at_level(logging.DEBUG):
+        OCIMonitoringClient(make_config(oci_auth="resource_principal"))
+    assert "SECRET" not in caplog.text

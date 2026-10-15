@@ -18,6 +18,11 @@ from dataclasses import dataclass, field
 import yaml
 
 
+AUTH_API_KEY = "api_key"
+AUTH_RESOURCE_PRINCIPAL = "resource_principal"
+AUTH_MODES = (AUTH_API_KEY, AUTH_RESOURCE_PRINCIPAL)
+
+
 @dataclass
 class MetricQuery:
     """One OCI Monitoring query — a ``(compartment, namespace, metrics)`` tuple.
@@ -63,8 +68,9 @@ class Config:
     # Polling cadence (OCI Monitoring aggregates to a 1-minute minimum).
     poll_interval_seconds: int
 
-    # OCI auth (traditional user + API key — see DEVELOPMENT.md). The SDK reads
-    # the config file itself; we only point it at the right file/profile/region.
+    # OCI auth (see DEVELOPMENT.md). In ``api_key`` mode the SDK reads the config
+    # file itself; we only point it at the right file/profile/region. In
+    # ``resource_principal`` mode the config file is not read at all.
     oci_config_file: str
     oci_profile: str
     oci_region: str
@@ -78,6 +84,10 @@ class Config:
     # restore them for debugging the HTTP/OTLP path.
     third_party_debug_logs: bool = False
 
+    # "api_key" (default: user API key from oci_config_file) or
+    # "resource_principal" (session token + key files fed by a sidecar).
+    oci_auth: str = AUTH_API_KEY
+
     queries: list[MetricQuery] = field(default_factory=list)
 
     def __post_init__(self):
@@ -85,6 +95,10 @@ class Config:
             raise ValueError("POLL_INTERVAL_SECONDS must be a positive integer")
         if not 1 <= self.metrics_port <= 65535:
             raise ValueError("METRICS_PORT must be between 1 and 65535")
+        if self.oci_auth not in AUTH_MODES:
+            raise ValueError(
+                f"OCI_AUTH must be one of {', '.join(AUTH_MODES)} (got {self.oci_auth!r})"
+            )
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -104,6 +118,7 @@ class Config:
             oci_region=os.getenv("OCI_REGION", ""),
             queries_file=queries_file,
             third_party_debug_logs=os.getenv("THIRD_PARTY_DEBUG_LOGS", "false").lower() == "true",
+            oci_auth=os.getenv("OCI_AUTH", AUTH_API_KEY).strip().lower() or AUTH_API_KEY,
             queries=load_queries(queries_file),
         )
 
