@@ -1,7 +1,7 @@
 # Compiles Python deps that don't ship aarch64 wheels for the runtime Python
 # (e.g. crc32c, a transitive dep of oci 2.178+). build-essential stays here;
 # the runtime stage copies only the installed packages out of /install.
-FROM python:3.14-slim AS py-builder
+FROM python:3.15-slim AS py-builder
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential && \
@@ -12,7 +12,7 @@ COPY pyproject.toml .
 RUN pip install --no-cache-dir --prefix=/install .
 
 
-FROM python:3.14-slim
+FROM python:3.15-slim
 
 # Apply security upgrades only; no build tools needed in the final image.
 RUN apt-get update && \
