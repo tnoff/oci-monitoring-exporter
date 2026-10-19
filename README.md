@@ -104,9 +104,10 @@ cluster, defined in
 
 - Image `iad.ocir.io/tnoff/oci-monitoring-exporter`; a release dispatches to
   docker-apps' `bump-image-pin.yml`, which updates the pin.
-- The OCI reader key comes from Secret `oci-monitoring-exporter-creds` (files
-  `config` and `api_key.pem`, mounted at `/home/exporter/.oci/`; the Deployment
-  restarts when it rotates).
+- It authenticates as a resource principal (`OCI_AUTH=resource_principal`): a
+  native `rpst` sidecar exchanges the pod's ServiceAccount token for a short-lived
+  token and rewrites it on a timer, so no API key is stored. The access is the
+  `k8s-workload-oci-monitoring-exporter` policy in `tnoff/terraform`.
 - The query list is the ConfigMap `oci-monitoring-exporter-queries`, mounted at
   `/etc/oci-monitoring-exporter/queries.yaml`. Currently `oci_computeagent`
   (CPU, memory), `oci_oke` (node condition) and `oci_objectstorage` (stored
