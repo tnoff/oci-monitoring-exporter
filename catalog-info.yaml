@@ -26,3 +26,8 @@ spec:
   system: monitoring
   consumesApis:
     - api:default/image-bump
+  dependsOn:
+    # Runs next to the exporter in its pod and trades the pod's ServiceAccount token for the
+    # OCI session token the exporter signs with (OCI_AUTH=resource_principal; see
+    # README.md, Authentication). The policy it is matched against is in terraform.
+    - component:default/rpst-sidecar
