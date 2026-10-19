@@ -81,6 +81,12 @@ Selected with `OCI_AUTH` (invalid values are a configuration error):
   poll instead of exiting; failed polls are logged and counted as
   `outcome="error"` as usual.
 
+In the cluster this runs as `resource_principal`: the Deployment in docker-apps
+(`monitoring/oci-monitoring-exporter`) adds the `rpst_sidecar` container, and the
+IAM policy it is matched against is `k8s_workloads` in `tnoff/terraform` `oci/`.
+How the pieces fit together, and how to put another workload on the same path, is in
+[the workload federation doc](https://github.com/tnoff/terraform-admin/blob/main/docs/k8s-workload-federation.md).
+
 Instance principals are not supported. See [DEVELOPMENT.md](DEVELOPMENT.md) for
 the environment-variable reference.
 
