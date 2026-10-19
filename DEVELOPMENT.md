@@ -31,8 +31,8 @@ Two modes, chosen with `OCI_AUTH` (instance principals are not supported):
 
 - `api_key` (default): a traditional OCI user + API key. The SDK reads a
   standard `~/.oci/config` profile; in production the profile + PEM key are
-  mounted into the Pod from a Kubernetes Secret
-  (`oci-monitoring-exporter-creds`), the same shape as `security-scanner-read-bot`.
+  mounted into the Pod from a Kubernetes Secret. Production no longer uses this
+  mode; it is for local runs.
   The reader user needs `read metrics` on the compartments it polls.
 - `resource_principal`: `oci.auth.signers.get_resource_principals_signer()`,
   fed by a sidecar that writes a session token and private key to files. The
