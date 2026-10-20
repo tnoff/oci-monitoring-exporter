@@ -42,6 +42,6 @@ consumer for its own internal observability. Don't conflate the two:
 
 ## Tests
 
-`tox` runs pytest + pylint + bandit across py3.13 / py3.14. pylint is expected
+`tox` runs pytest + pylint + bandit across py3.13 / py3.14 / py3.15. pylint is expected
 at 10/10, and CI enforces **100% diff coverage** (`diff-cover --fail-under=100`)
 — every changed `src/` line must be tested or `# pragma: no cover`'d.
