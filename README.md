@@ -121,6 +121,6 @@ cluster, defined in
 
 ```bash
 pip install -e '.[dev]'
-tox                 # pytest + pylint + bandit across py3.13 / py3.14
+tox                 # pytest + pylint + bandit across py3.13 / py3.14 / py3.15
 python -m src.oci_monitoring_exporter
 ```

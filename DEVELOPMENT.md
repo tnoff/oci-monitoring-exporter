@@ -10,7 +10,7 @@ pip install -e '.[dev]'
 Run the full check suite (matches CI):
 
 ```bash
-tox            # pytest + pylint + bandit across py3.13 / py3.14
+tox            # pytest + pylint + bandit across py3.13 / py3.14 / py3.15
 tox -e pytest  # tests + HTML coverage only
 tox -e pylint  # lint only
 tox -e bandit  # security lint only
