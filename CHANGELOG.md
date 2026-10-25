@@ -6,6 +6,12 @@ file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.18] - 2026-10-25
+
+### Changed
+
+- Bumped oci to v2.188.0
+
 ## [0.2.17] - 2026-10-20
 
 ### Changed
