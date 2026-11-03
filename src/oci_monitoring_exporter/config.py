@@ -10,6 +10,8 @@ Two sources, kept deliberately separate:
 
 The query list is intentionally *not* hardcoded here — terraform/docker-apps
 stamps it into a ConfigMap so coverage changes don't require an image rebuild.
+A query may omit ``compartment_id``; ``OCI_COMPARTMENT_ID`` then supplies it, so
+the query file can live in a public repo without naming the compartment.
 """
 
 import os
@@ -43,7 +45,9 @@ class MetricQuery:
 
     def __post_init__(self):
         if not self.compartment_id:
-            raise ValueError("metric query is missing 'compartment_id'")
+            raise ValueError(
+                "metric query is missing 'compartment_id' (set it on the query or via OCI_COMPARTMENT_ID)"
+            )
         if not self.namespace:
             raise ValueError(f"metric query for {self.compartment_id} is missing 'namespace'")
         if not self.metric_names:
@@ -119,12 +123,15 @@ class Config:
             queries_file=queries_file,
             third_party_debug_logs=os.getenv("THIRD_PARTY_DEBUG_LOGS", "false").lower() == "true",
             oci_auth=os.getenv("OCI_AUTH", AUTH_API_KEY).strip().lower() or AUTH_API_KEY,
-            queries=load_queries(queries_file),
+            queries=load_queries(queries_file, os.getenv("OCI_COMPARTMENT_ID", "").strip()),
         )
 
 
-def load_queries(path: str) -> list[MetricQuery]:
+def load_queries(path: str, default_compartment_id: str = "") -> list[MetricQuery]:
     """Parse the YAML query file into :class:`MetricQuery` objects.
+
+    ``default_compartment_id`` fills in any query that has no ``compartment_id``
+    of its own; a query that sets one keeps it.
 
     Expected shape::
 
@@ -152,7 +159,7 @@ def load_queries(path: str) -> list[MetricQuery]:
     for entry in entries:
         queries.append(
             MetricQuery(
-                compartment_id=entry.get("compartment_id", ""),
+                compartment_id=entry.get("compartment_id") or default_compartment_id,
                 namespace=entry.get("namespace", ""),
                 metric_names=entry.get("metric_names", []) or [],
                 resource_group=entry.get("resource_group") or None,

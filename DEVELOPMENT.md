@@ -46,6 +46,7 @@ Two modes, chosen with `OCI_AUTH` (instance principals are not supported):
 | Variable                | Default                                       | Purpose                                                      |
 |-------------------------|-----------------------------------------------|--------------------------------------------------------------|
 | `QUERIES_FILE`          | `/etc/oci-monitoring-exporter/queries.yaml`   | Path to the YAML query config (mounted as a ConfigMap).      |
+| `OCI_COMPARTMENT_ID`    | _(unset)_                                      | Compartment OCID for any query in the YAML that omits `compartment_id`. A query's own value wins. Lets the query file be committed without naming the compartment. |
 | `METRICS_ADDR`          | `0.0.0.0`                                      | Bind address for the HTTP server.                            |
 | `METRICS_PORT`          | `9090`                                         | Port for `/metrics` + `/healthz`.                            |
 | `POLL_INTERVAL_SECONDS` | `60`                                           | Seconds between OCI poll cycles (OCI aggregates to 1m min).  |

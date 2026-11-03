@@ -8,6 +8,9 @@
 #
 # The metrics below are per-instance CPU/memory and OKE node readiness. Replace
 # the compartment OCID with your own and adjust namespaces/metrics to taste.
+#
+# An entry may omit compartment_id; the OCI_COMPARTMENT_ID environment variable
+# then supplies it. A compartment_id set on an entry always wins.
 
 queries:
   # Per-instance CPU + memory (the bulk of the existing compute alarms).
