@@ -12,6 +12,7 @@ def test_from_env_defaults(monkeypatch):
         "OTLP_ENDPOINT", "OTLP_METRICS_ENABLED", "OTLP_LOGS_ENABLED", "METRICS_PORT",
         "METRICS_ADDR", "POLL_INTERVAL_SECONDS", "OCI_CONFIG_FILE", "OCI_PROFILE",
         "OCI_REGION", "OCI_AUTH", "QUERIES_FILE", "THIRD_PARTY_DEBUG_LOGS",
+        "OCI_COMPARTMENT_ID",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -94,6 +95,42 @@ def test_load_queries_parses_yaml(tmp_path):
     assert queries[1].resource_group == "web"
     assert queries[1].statistic == "sum"
     assert queries[1].interval == "5m"
+
+
+def test_load_queries_default_compartment_fills_missing_only(tmp_path):
+    f = tmp_path / "queries.yaml"
+    f.write_text(textwrap.dedent("""
+        queries:
+          - namespace: oci_computeagent
+            metric_names: [CpuUtilization]
+          - compartment_id: ocid1.compartment.oc1..own
+            namespace: oci_lbaas
+            metric_names: [HttpResponses5xx]
+    """))
+
+    queries = load_queries(str(f), "ocid1.compartment.oc1..default")
+
+    assert queries[0].compartment_id == "ocid1.compartment.oc1..default"
+    assert queries[1].compartment_id == "ocid1.compartment.oc1..own"
+
+
+def test_load_queries_missing_compartment_without_default_is_rejected(tmp_path):
+    f = tmp_path / "queries.yaml"
+    f.write_text("queries:\n  - namespace: oci_computeagent\n    metric_names: [CpuUtilization]\n")
+
+    with pytest.raises(ValueError, match="OCI_COMPARTMENT_ID"):
+        load_queries(str(f))
+
+
+def test_from_env_reads_default_compartment(monkeypatch, tmp_path):
+    f = tmp_path / "queries.yaml"
+    f.write_text("queries:\n  - namespace: oci_oke\n    metric_names: [KubernetesNodeCondition]\n")
+    monkeypatch.setenv("QUERIES_FILE", str(f))
+    monkeypatch.setenv("OCI_COMPARTMENT_ID", "  ocid1.compartment.oc1..fromenv  ")
+
+    cfg = Config.from_env()
+
+    assert cfg.queries[0].compartment_id == "ocid1.compartment.oc1..fromenv"
 
 
 def test_load_queries_rejects_non_list(tmp_path):
