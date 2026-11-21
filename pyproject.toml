@@ -11,7 +11,7 @@ requires-python = ">=3.13"
 dependencies = [
     "oci==2.190.0",
     "prometheus-client==0.26.0",
-    "PyYAML==6.0.3",
+    "PyYAML==6.0.4",
     "opentelemetry-api",
     "opentelemetry-sdk==1.45.2",
     "opentelemetry-exporter-otlp",
